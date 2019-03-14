@@ -6,6 +6,7 @@ import re
 import urllib
 import json
 import mysql.connector
+import pymysql
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from config import get_conn
@@ -13,16 +14,32 @@ from config import get_conn
 def get_data_frame():
     return pd.DataFrame(columns=('source', 'source_record_id', 'posted', 'link', 'title', 'description', 'location', 'other'))
 
+def select_path(base, path):
+    result = ""
+    regex = ""
+    if (path.find("/~") != -1):
+        regex = path[path.find("/~") + 2:]
+        path = path[0:path.find("/~")]
+    if (path.find("/@") != -1):
+        attr = path[path.find("/@") + 2:]
+        path = path[0:path.find("/@")]
+        result = base.select_one(path)[attr]
+    else:
+        result = base.select_one(path).text.strip()
+    if (regex != ""):
+        result = re.search(regex, result).group(1).strip()
+    return result
+
 def save_data_frame(data):
     sys.stdout.write("Saving " + str(len(data)) + " records: ")
     sys.stdout.flush()
     myconn = get_conn()
-    mycursor = myconn.cursor()
+    mycursor = myconn.cursor(pymysql.cursors.DictCursor)
     for index, record in data.iterrows():
-        sql = "select count(*) from job_posting inner join source on job_posting.source_id = source.id where source.source = %s and job_posting.source_record_id = %s"
+        sql = "select count(*) as num from job_posting inner join source on job_posting.source_id = source.id where source.source = %s and job_posting.source_record_id = %s"
         mycursor.execute(sql, (record["source"], record["source_record_id"]))
         myresult = mycursor.fetchone()
-        if (myresult[0] == 0):
+        if (myresult["num"] == 0):
             sql = "insert into job_posting ("
             for col in data.columns:
                 if (col == "source"):
@@ -49,8 +66,8 @@ def save_data_frame(data):
 
 def get_job_posting_urls():
     myconn = get_conn()
-    mycursor = myconn.cursor()
-    mycursor.execute("select source.source, job_posting_url.url, job_posting_url.method from job_posting_url inner join source on job_posting_url.source_id = source.id")
+    mycursor = myconn.cursor(pymysql.cursors.DictCursor)
+    mycursor.execute("select source.source, job_posting_url.* from job_posting_url inner join source on job_posting_url.source_id = source.id")
     myresult = mycursor.fetchall()
     mycursor.close()
     myconn.close()
@@ -73,7 +90,7 @@ def scrape_lease_labau():
             source_record_id = urllib.parse.unquote(re.search("JobID=(.*)", link).group(1))
             data = data.append({ 'source': 'leaselabau.com', 'source_record_id': source_record_id, 'link': link, 'title': title,  'description': description, 'other': other }, ignore_index=True)
         except:
-            pass
+            print("An error occurred")
     return data
 
 def scrape_ala():
@@ -97,7 +114,7 @@ def scrape_ala():
             source_record_id = urllib.parse.unquote(re.search("Ad #(A[0-9]*)\\D", other).group(1))
             data = data.append({ 'source': 'alanet.org', 'source_record_id': source_record_id, 'link': link, 'title': title,  'description': description, 'location': location, 'other': other }, ignore_index=True)
         except:
-            pass
+            print("An error occurred")
     return data
 
 def scrape_mla():
@@ -108,30 +125,6 @@ def scrape_mla():
     for result in content["Results"]:
         data = data.append({ 'source': 'mlaglobal.com', 'source_record_id': result["Id"], 'link': result["JobUrl"], 'title': result["Title"],  'description': result["Teaser"], 'location': result["Location"], 'other': "" }, ignore_index=True)
     return data;
-
-def scrape_kirkland_staff():
-    data = get_data_frame()
-    url = "https://staffjobsus.kirkland.com/jobs/search/?q=&location_city=&sort_by=cfml10%2Cdesc"
-    page_response = requests.get(url, timeout=5)
-    page_content = BeautifulSoup(page_response.content, "html.parser")
-    job_divs = page_content.find_all("div", attrs={ 'class': 'jobs-section__item' })
-    for job_div in job_divs:
-        title_h2 = job_div.find("h2")
-        title_a = title_h2.find("a")
-        title = title_a.text
-        link = title_a["href"]
-        source_record_id = re.search("jobs/(\d*)-", link).group(0)
-        description = job_div.find("div", attrs={ "class": "jobs-section__item-hover-text" }).text
-        location = ""
-        posted = ""
-        divs = job_div.find_all("div")
-        for div in divs:
-            if (div.text.__contains__("Location: ")):
-                location = div.text.replace("Location: ", "")
-            if (div.text.__contains__("Posted: ")):
-                posted = div.text.replace("Posted: ", "")
-        data = data.append({ 'source': 'kirkland.com', 'source_record_id': source_record_id, 'link': link, 'title': title,  'description': description, 'location': location, "posted": posted }, ignore_index=True)
-    return data
 
 def scrape_viDesktop(url, source):
     base_url = url[0:url.find("ReDefault.aspx") - 1]
@@ -168,38 +161,87 @@ def scrape_jobvite(url, source):
                 source_record_id = re.search("/job/([A-Za-z0-9]*)", link).group(1).strip()
                 data = data.append({ 'source': source, 'source_record_id': source_record_id, 'link': link, 'title': title, 'location': location }, ignore_index=True)
             except:
-                pass
+                print("An error occurred")
     return data
 
 def scrape_silkroad(url, source):
+    base_url = url[0:url.find("index.cfm")]
+    data = get_data_frame()
+    page_response = requests.get(url, timeout=5, verify=False)
+    page_content = BeautifulSoup(page_response.content, "html.parser")
+    trs = page_content.find_all("tr", attrs={ "class": "cssSearchResultsHighlight" })
+    for tr in trs:
+        try:
+            tds = tr.find_all("td")
+            title = tds[1].text.strip()
+            link = base_url + tds[1].find("a")["href"]
+            location = tds[2].text.strip()
+            source_record_id = tds[0].text.strip()
+            data = data.append({ 'source': source, 'source_record_id': source_record_id, 'link': link, 'title': title, 'location': location }, ignore_index=True)
+        except:
+            print("An error occurred")
+    return data
+
+def scrape_taleo(url, source):
     pass
 
-def scrape_silkroad(url, source):
-    pass
+def scrape_custom(params):
+    base_url = params["url"][0:params["url"].rfind("/") + 1]
+    data = get_data_frame()
+    page_response = requests.get(params["url"], timeout=5, verify=False)
+    page_content = BeautifulSoup(page_response.content, "html.parser")
+    postings = page_content.select(params["each_posting_path"])
+    for posting in postings:
+        try:
+            title = ""
+            description = ""
+            source_record_id = ""
+            posted = ""
+            link = ""
+            location = ""
+            if (params["title_path"] != None and params["title_path"] != ""):
+                title = select_path(posting, params["title_path"])
+            if (params["description_path"] != None and params["description_path"] != ""):
+                description = select_path(posting, params["description_path"])
+            if (params["source_record_id_path"] != None and params["source_record_id_path"] != ""):
+                source_record_id = select_path(posting, params["source_record_id_path"])
+            if (params["posted_path"] != None and params["posted_path"] != ""):
+                posted = select_path(posting, params["posted_path"])
+            if (params["link_path"] != None and params["link_path"] != ""):
+                link = select_path(posting, params["link_path"])
+            if (params["location_path"] != None and params["location_path"] != ""):
+                location = select_path(posting, params["location_path"])
+            data = data.append({ 'source': params["source"], 'source_record_id': source_record_id, 'link': link, 'title': title, 'location': location, 'description': description, 'posted': posted }, ignore_index=True)
+        except:
+            print("An error occurred")
+    return data
 
 data = get_data_frame()
 for url in get_job_posting_urls():
-    print("Retrieving " + url[1])
-    if (url[2].lower() == "videsktop"):
-        data = data.append(scrape_viDesktop(url[1], url[0]), ignore_index=True)
-    if (url[2].lower() == "jobvite"):
-        data = data.append(scrape_jobvite(url[1], url[0]), ignore_index=True)
-    if (url[2].lower() == "silkroad"):
-        data = data.append(scrape_silkroad(url[1], url[0]), ignore_index=True)
-    if (url[2].lower() == "taleo"):
-        data = data.append(scrape_taleo(url[1], url[0]), ignore_index=True)
+    print("Retrieving " + url["url"])
+    if (url["method"].lower() == "videsktop"):
+        data = data.append(scrape_viDesktop(url["url"], url["source"]), ignore_index=True)
+    if (url["method"].lower() == "jobvite"):
+        data = data.append(scrape_jobvite(url["url"], url["source"]), ignore_index=True)
+    if (url["method"].lower() == "silkroad"):
+        data = data.append(scrape_silkroad(url["url"], url["source"]), ignore_index=True)
+    if (url["method"].lower() == "taleo"):
+        data = data.append(scrape_taleo(url["url"], url["source"]), ignore_index=True)
+    if (url["method"].lower() == "custom"):
+        data = data.append(scrape_custom(url), ignore_index=True)
     print("Total records (cumulative): " + str(len(data)))
 #data = data.append(scrape_lease_labau(), ignore_index=True)
 #data = data.append(scrape_ala(), ignore_index=True)
 #data = data.append(scrape_mla(), ignore_index=True)
-#data = data.append(scrape_kirkland_staff(), ignore_index=True)
 data = data.fillna("")
-save_data_frame(data)
+#save_data_frame(data)
+print(data)
+print("Done.")
 
 # For completeness
-# WilmerHale:
-# - https://wilmerhale-openhire.silkroad.com/epostings/index.cfm?fuseaction=app.jobsearch
-# - https://www.wilmerhale.com/en/careers/lawyers
+# Paul Weiss:
+# - https://paulweiss-ats.silkroad.com/epostings/index.cfm?fuseaction=app.jobsearch
+# - https://www.paulweiss.com/careers/lawyers/laterals-clerks
 
 # Mofo (various taleo):
 # - https://careers.mofo.com/apply/
@@ -212,7 +254,4 @@ save_data_frame(data)
 # - https://www.ropesgray.com/en/legalhiring/Career-Opportunities/Lateral-Associates/All-Positions
 # - https://chm.tbe.taleo.net/chm02/ats/careers/v2/jobSearch?org=ROPESGRAY
 
-#print(data)
-
-print("Done.")
 
