@@ -22,6 +22,7 @@ bld/
 [Oo]bj/
 [Ll]og/
 config.py
+connection.php
 
 # Visual Studio 2015 cache/options directory
 .vs/
