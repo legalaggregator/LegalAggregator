@@ -73,26 +73,6 @@ def get_job_posting_urls():
     myconn.close()
     return myresult
 
-def scrape_lease_labau():
-    data = get_data_frame()
-    url = "http://www.leaselabau.com/jobs/JobSeeker/search.cfm?page=position-search"
-    page_response = requests.get(url, timeout=5)
-    page_content = BeautifulSoup(page_response.content, "html.parser")
-    title_tds = page_content.find_all("td", attrs={ 'class': 'job-post-title' })
-    for title_td in title_tds:
-        try:
-            link_a = title_td.find("dt").find('a')
-            other_td = title_td.find_next_sibling('td', attrs={ 'class': 'job-post-date' })
-            title = title_td.find("dt").text.strip()
-            description = title_td.find("dd").text.strip()
-            other = other_td.text.strip().strip()
-            link = "http://www.leaselabau.com/jobs/JobSeeker/" + link_a['href']
-            source_record_id = urllib.parse.unquote(re.search("JobID=(.*)", link).group(1))
-            data = data.append({ 'source': 'leaselabau.com', 'source_record_id': source_record_id, 'link': link, 'title': title,  'description': description, 'other': other }, ignore_index=True)
-        except:
-            print("An error occurred")
-    return data
-
 def scrape_ala():
     data = get_data_frame()
     url = "https://my.alanet.org/careers/jobs.asp?results=100"
@@ -113,18 +93,10 @@ def scrape_ala():
             link = "https://my.alanet.org/careers/" + link_a['href']
             source_record_id = urllib.parse.unquote(re.search("Ad #(A[0-9]*)\\D", other).group(1))
             data = data.append({ 'source': 'alanet.org', 'source_record_id': source_record_id, 'link': link, 'title': title,  'description': description, 'location': location, 'other': other }, ignore_index=True)
-        except:
+        except Exception as e:
             print("An error occurred")
+            print(e)
     return data
-
-def scrape_mla():
-    data = get_data_frame()
-    url = "https://www.mlaglobal.com/enterprise/jobs/jobfeeddata?data=%7B%22keyword%22%3A%22%22%2C%22location%22%3A%22US%22%2C%22searchOnCountryLevel%22%3Atrue%2C%22paramArray%22%3A%5B%5D%2C%22count%22%3A100%2C%22page%22%3A%221%22%2C%22keyValueParameters%22%3A%7B%22%22%3Anull%7D%2C%22sortBy%22%3A%22Distance%22%2C%22pageId%22%3A%22%7B01E3CDA9-F753-4480-9B6E-79A0AE3CD0B0%7D%22%2C%22countryFilter%22%3Afalse%7D"
-    page_response = requests.get(url, timeout=5)
-    content = json.loads(page_response.content)
-    for result in content["Results"]:
-        data = data.append({ 'source': 'mlaglobal.com', 'source_record_id': result["Id"], 'link': result["JobUrl"], 'title': result["Title"],  'description': result["Teaser"], 'location': result["Location"], 'other': "" }, ignore_index=True)
-    return data;
 
 def scrape_viDesktop(url, source):
     base_url = url[0:url.find("ReDefault.aspx") - 1]
@@ -140,8 +112,9 @@ def scrape_viDesktop(url, source):
             description = row_div.find_next_sibling("div", attrs={ "class": "RichTextContent" }).text.strip()
             source_record_id = re.search("JobID=(\\d*)", link).group(1).strip()
             data = data.append({ 'source': source, 'source_record_id': source_record_id, 'link': link, 'title': title, 'description': description, }, ignore_index=True)
-        except:
+        except Exception as e:
             print("An error occurred")
+            print(e)
     return data
 
 def scrape_jobvite(url, source):
@@ -160,8 +133,9 @@ def scrape_jobvite(url, source):
                 location = tr.find("td", attrs={ "class": "jv-job-list-location" }).text.strip()
                 source_record_id = re.search("/job/([A-Za-z0-9]*)", link).group(1).strip()
                 data = data.append({ 'source': source, 'source_record_id': source_record_id, 'link': link, 'title': title, 'location': location }, ignore_index=True)
-            except:
+            except Exception as e:
                 print("An error occurred")
+                print(e)
     return data
 
 def scrape_silkroad(url, source):
@@ -178,12 +152,43 @@ def scrape_silkroad(url, source):
             location = tds[2].text.strip()
             source_record_id = tds[0].text.strip()
             data = data.append({ 'source': source, 'source_record_id': source_record_id, 'link': link, 'title': title, 'location': location }, ignore_index=True)
-        except:
+        except Exception as e:
             print("An error occurred")
+            print(e)
     return data
 
 def scrape_taleo(url, source):
     pass
+
+def scrape_json(params):
+    data = get_data_frame()
+    page_response = requests.get(params["url"], timeout=5)
+    content = json.loads(page_response.content)
+    for posting in content[params["each_posting_path"]]:
+        try:
+            title = ""
+            description = ""
+            source_record_id = ""
+            posted = ""
+            link = ""
+            location = ""
+            if (params["title_path"] != None and params["title_path"] != ""):
+                title = posting[params["title_path"]]
+            if (params["description_path"] != None and params["description_path"] != ""):
+                description = posting[params["description_path"]]
+            if (params["source_record_id_path"] != None and params["source_record_id_path"] != ""):
+                source_record_id = posting[params["source_record_id_path"]]
+            if (params["posted_path"] != None and params["posted_path"] != ""):
+                posted = posting[params["posted_path"]]
+            if (params["link_path"] != None and params["link_path"] != ""):
+                link = posting[params["link_path"]]
+            if (params["location_path"] != None and params["location_path"] != ""):
+                location = posting[params["location_path"]]
+            data = data.append({ 'source': params["source"], 'source_record_id': source_record_id, 'link': link, 'title': title, 'location': location, 'description': description, 'posted': posted }, ignore_index=True)
+        except Exception as e:
+            print("An error occurred")
+            print(e)
+    return data;
 
 def scrape_custom(params):
     base_url = params["url"][0:params["url"].rfind("/") + 1]
@@ -212,8 +217,9 @@ def scrape_custom(params):
             if (params["location_path"] != None and params["location_path"] != ""):
                 location = select_path(posting, params["location_path"])
             data = data.append({ 'source': params["source"], 'source_record_id': source_record_id, 'link': link, 'title': title, 'location': location, 'description': description, 'posted': posted }, ignore_index=True)
-        except:
+        except Exception as e:
             print("An error occurred")
+            print(e)
     return data
 
 data = get_data_frame()
@@ -229,29 +235,12 @@ for url in get_job_posting_urls():
         data = data.append(scrape_taleo(url["url"], url["source"]), ignore_index=True)
     if (url["method"].lower() == "custom"):
         data = data.append(scrape_custom(url), ignore_index=True)
+    if (url["method"].lower() == "json"):
+        data = data.append(scrape_json(url), ignore_index=True)
     print("Total records (cumulative): " + str(len(data)))
-#data = data.append(scrape_lease_labau(), ignore_index=True)
 #data = data.append(scrape_ala(), ignore_index=True)
-#data = data.append(scrape_mla(), ignore_index=True)
 data = data.fillna("")
-#save_data_frame(data)
-print(data)
+save_data_frame(data)
+#print(data)
 print("Done.")
-
-# For completeness
-# Paul Weiss:
-# - https://paulweiss-ats.silkroad.com/epostings/index.cfm?fuseaction=app.jobsearch
-# - https://www.paulweiss.com/careers/lawyers/laterals-clerks
-
-# Mofo (various taleo):
-# - https://careers.mofo.com/apply/
-
-
-
-# kslaw.com:
-# - kslaw.com has attorney positions posted on their website
-# Ropes & Gray:
-# - https://www.ropesgray.com/en/legalhiring/Career-Opportunities/Lateral-Associates/All-Positions
-# - https://chm.tbe.taleo.net/chm02/ats/careers/v2/jobSearch?org=ROPESGRAY
-
 
