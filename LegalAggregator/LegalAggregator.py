@@ -17,10 +17,35 @@ def get_data_frame():
 def select_path(base, path):
     result = ""
     regex = ""
+    while True:
+        if (path[0:3] == "../"):
+            base = base.parent
+            path = path[3:]
+        elif (path[0:5] == "next("):
+            tag = path[path.find("(") + 1 : path.find(")")]
+            if (tag == ""):
+                base = base.next_sibling
+            else:
+                base = base.find_next_sibling(tag)
+            path = path[path.find(")") + 1 : ].strip("/")
+        elif (path[0:5] == "prev("):
+            tag = path[path.find("(") + 1 : path.find(")")]
+            if (tag == ""):
+                base = base.previous_sibling
+            else:
+                base = base.find_previous_sibling(tag)
+            path = path[path.find(")") + 1 : ].strip("/")
+        else:
+            break
     if (path.find("/~") != -1):
         regex = path[path.find("/~") + 2:]
         path = path[0:path.find("/~")]
-    if (path.find("/@") != -1):
+    if (path.find("~") == 0):
+        regex = path[1:]
+        path = ""
+    if (path == ""):
+        result = base.text.strip()
+    elif (path.find("/@") != -1):
         attr = path[path.find("/@") + 2:]
         path = path[0:path.find("/@")]
         result = base.select_one(path)[attr]
@@ -67,36 +92,11 @@ def save_data_frame(data):
 def get_job_posting_urls():
     myconn = get_conn()
     mycursor = myconn.cursor(pymysql.cursors.DictCursor)
-    mycursor.execute("select source.source, job_posting_url.* from job_posting_url inner join source on job_posting_url.source_id = source.id")
+    mycursor.execute("select source.source, job_posting_url.* from job_posting_url inner join source on job_posting_url.source_id = source.id where url like '%ala%'")
     myresult = mycursor.fetchall()
     mycursor.close()
     myconn.close()
     return myresult
-
-def scrape_ala():
-    data = get_data_frame()
-    url = "https://my.alanet.org/careers/jobs.asp?results=100"
-    page_response = requests.get(url, timeout=5)
-    page_content = BeautifulSoup(page_response.content, "html.parser")
-    title_tds = page_content.find_all("td", attrs={ 'class': 'jobtitle' })
-    for title_td in title_tds:
-        try:
-            link_a = title_td.find('a')
-            title_tr = title_td.parent
-            location_tr = title_tr.find_next_sibling("tr")
-            description_tr = location_tr.find_next_sibling("tr")
-            other_tr = description_tr.find_next("span", attrs={ 'class': 'posnum' }).find_parent('tr')
-            title = title_td.text.strip()
-            location = location_tr.text.strip()
-            description = description_tr.text.strip()
-            other = other_tr.text.strip()
-            link = "https://my.alanet.org/careers/" + link_a['href']
-            source_record_id = urllib.parse.unquote(re.search("Ad #(A[0-9]*)\\D", other).group(1))
-            data = data.append({ 'source': 'alanet.org', 'source_record_id': source_record_id, 'link': link, 'title': title,  'description': description, 'location': location, 'other': other }, ignore_index=True)
-        except Exception as e:
-            print("An error occurred")
-            print(e)
-    return data
 
 def scrape_viDesktop(url, source):
     base_url = url[0:url.find("ReDefault.aspx") - 1]
@@ -238,7 +238,6 @@ for url in get_job_posting_urls():
     if (url["method"].lower() == "json"):
         data = data.append(scrape_json(url), ignore_index=True)
     print("Total records (cumulative): " + str(len(data)))
-#data = data.append(scrape_ala(), ignore_index=True)
 data = data.fillna("")
 save_data_frame(data)
 #print(data)
