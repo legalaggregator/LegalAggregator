@@ -14,7 +14,7 @@
 
     <title>
 <?php
-$links = array("Sources" => "source.php", "Job Posting URLs" => "job_posting_url.php");
+$links = array("Sources" => "source.php", "Job Posting URLs" => "job_posting_url.php", "Job Postings" => "job_posting.php");
 foreach ($links as $title => $url)
   if (strpos($_SERVER["SCRIPT_NAME"], $url) !== false) print($title . ", Legal Aggregator Admin");
 ?>

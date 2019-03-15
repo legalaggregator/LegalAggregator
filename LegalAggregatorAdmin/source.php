@@ -29,10 +29,7 @@ include_once("includes/data_editor.php");
 <?php
 $conn = conn();
 $result = $conn->query("select * from source");
-$data = array();
-while($record = $result->fetch_assoc())
-  $data[] = $record;
-print("<script>window.data_editor.init_table('#data_table', " . json_encode($data) . ");</script>");
+print("<script>window.data_editor.init_table('#data_table', " . forgiving_json($result) . ");</script>");
 $conn->close();
 
 include_once("includes/footer.php");

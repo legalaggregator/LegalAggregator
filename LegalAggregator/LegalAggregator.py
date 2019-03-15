@@ -53,7 +53,8 @@ def select_path(base, path):
         result = base.select_one(path).text.strip()
     if (regex != ""):
         result = re.search(regex, result).group(1).strip()
-    return result
+    return re.sub(r'[^\x20-\x7F]+', ' ', result)
+    #return result.encode("ascii", errors="ignore").decode()
 
 def save_data_frame(data):
     sys.stdout.write("Saving " + str(len(data)) + " records: ")
@@ -92,7 +93,7 @@ def save_data_frame(data):
 def get_job_posting_urls():
     myconn = get_conn()
     mycursor = myconn.cursor(pymysql.cursors.DictCursor)
-    mycursor.execute("select source.source, job_posting_url.* from job_posting_url inner join source on job_posting_url.source_id = source.id where url like '%ala%'")
+    mycursor.execute("select source.source, job_posting_url.* from job_posting_url inner join source on job_posting_url.source_id = source.id")
     myresult = mycursor.fetchall()
     mycursor.close()
     myconn.close()
