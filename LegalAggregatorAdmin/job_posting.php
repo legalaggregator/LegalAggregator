@@ -42,7 +42,7 @@ include_once("includes/data_editor.php");
 
 <?php
 $conn = conn();
-$result = $conn->query("select job_posting.*, source.source from job_posting inner join source on job_posting.source_id = source.id where source.source like '%mla%'");
+$result = $conn->query("select job_posting.*, source.source from job_posting inner join source on job_posting.source_id = source.id");
 print("<script>window.data_editor.init_table('#data_table', " . forgiving_json($result) . ");</script>");
 $conn->close();
 

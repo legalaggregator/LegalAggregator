@@ -109,9 +109,12 @@ def scrape_viDesktop(url, source):
         try:
             row_div = c7_div.parent
             title = row_div.find("h4").text.strip()
-            link = base_url + row_div.select_one("a[href*='ReJobView']")["href"]
+            link_a = row_div.select_one("a[href*='ReJobView']")
+            link = ""
+            if (link_a != None): link = base_url + link_a["href"]
             description = row_div.find_next_sibling("div", attrs={ "class": "RichTextContent" }).text.strip()
-            source_record_id = re.search("JobID=(\\d*)", link).group(1).strip()
+            source_record_id = ""
+            if (link != ""): source_record_id = re.search("JobID=(\\d*)", link).group(1).strip()
             data = data.append({ 'source': source, 'source_record_id': source_record_id, 'link': link, 'title': title, 'description': description, }, ignore_index=True)
         except Exception as e:
             print("An error occurred")
@@ -124,9 +127,10 @@ def scrape_jobvite(url, source):
     page_content = BeautifulSoup(page_response.content, "html.parser")
     tables = page_content.find_all("table", attrs={ "class": "jv-job-list" })
     for table in tables:
-        trs = table.find_all("tr")
-        for tr in trs:
+        tds = table.select("td.jv-job-list-name")
+        for td in tds:
             try:
+                tr = td.parent
                 name_td = tr.find("td", attrs={ "class": "jv-job-list-name" })
                 name_a = name_td.find("a")
                 title = name_a.text.strip()
@@ -226,6 +230,7 @@ def scrape_custom(params):
 data = get_data_frame()
 for url in get_job_posting_urls():
     print("Retrieving " + url["url"])
+    prev_count = len(data)
     if (url["method"].lower() == "videsktop"):
         data = data.append(scrape_viDesktop(url["url"], url["source"]), ignore_index=True)
     if (url["method"].lower() == "jobvite"):
@@ -238,7 +243,8 @@ for url in get_job_posting_urls():
         data = data.append(scrape_custom(url), ignore_index=True)
     if (url["method"].lower() == "json"):
         data = data.append(scrape_json(url), ignore_index=True)
-    print("Total records (cumulative): " + str(len(data)))
+    print("New records: " + str(len(data)- prev_count))
+    #print("Total records (cumulative): " + str(len(data)))
 data = data.fillna("")
 save_data_frame(data)
 #print(data)
