@@ -32,7 +32,7 @@ window.data_editor.save_row = function(sender) {
   $("#data_editor_cmd").val("update");
   $("#data_editor_cmd_id").val(id);
   data = {};
-  for(let cell of $tr.find("td")) {
+  for(let cell of $tr.find("td[data-column]")) {
     var $cell = $(cell);
     var $input = $cell.find(":input");
     if ($input.length != 0) {
