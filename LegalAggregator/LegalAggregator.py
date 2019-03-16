@@ -15,6 +15,10 @@ def get_data_frame():
     return pd.DataFrame(columns=('source', 'source_record_id', 'posted', 'link', 'title', 'description', 'location', 'other'))
 
 def select_path(base, path):
+    if (path.find("+") != -1):
+        return select_path(base, path[0:path.find(" + ")].strip()) + select_path(base, path[path.find("+")+1:].strip())
+    if (path[0] == "'" and path[-1] == "'"):
+        return path[1:-1]
     result = ""
     regex = ""
     while True:
