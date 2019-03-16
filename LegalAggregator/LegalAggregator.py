@@ -105,7 +105,7 @@ def get_job_posting_urls():
         from job_posting_url inner 
         join source on job_posting_url.source_id = source.id 
         join method on job_posting_url.method_id = method.id 
-        where url like '%kslaw.com/pages/%'
+        -- where url like '%kslaw.com/pages/%'
         """)
     myresult = mycursor.fetchall()
     mycursor.close()
@@ -260,6 +260,6 @@ for url in get_job_posting_urls():
     #print("Total records (cumulative): " + str(len(data)))
 data = data.fillna("")
 save_data_frame(data)
-print(data.to_string())
+#print(data.to_string())
 print("Done.")
 
