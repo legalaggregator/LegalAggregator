@@ -43,7 +43,7 @@ def select_path(base, path):
     if (path.find("~") == 0):
         regex = path[1:]
         path = ""
-    if (path == ""):
+    if (path == "" or path == "."):
         result = base.text.strip()
     elif (path.find("/@") != -1):
         attr = path[path.find("/@") + 2:]
@@ -93,7 +93,7 @@ def save_data_frame(data):
 def get_job_posting_urls():
     myconn = get_conn()
     mycursor = myconn.cursor(pymysql.cursors.DictCursor)
-    mycursor.execute("select source.source, job_posting_url.* from job_posting_url inner join source on job_posting_url.source_id = source.id")
+    mycursor.execute("select source.source, job_posting_url.* from job_posting_url inner join source on job_posting_url.source_id = source.id where url like '%kslaw.com/pages/%'")
     myresult = mycursor.fetchall()
     mycursor.close()
     myconn.close()
@@ -247,6 +247,6 @@ for url in get_job_posting_urls():
     #print("Total records (cumulative): " + str(len(data)))
 data = data.fillna("")
 save_data_frame(data)
-#print(data)
+print(data.to_string())
 print("Done.")
 
