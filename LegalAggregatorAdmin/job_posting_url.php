@@ -16,14 +16,15 @@ include_once("includes/data_editor.php");
         <table class="table">
           <tr><td colspan="2" data-column='commands'></td></tr>
           <tr><td>URL: </td><td data-column='url'><textarea style="width: 100%; height: 100px;"></textarea></td></tr>
-          <tr><td>Method: </td><td data-column='method'>
+          <tr><td>Method: </td><td data-column='method_id'>
             <select style='width: 100%;'>
-              <option value="Custom">Custom</option>
-              <option value="JSON">JSON</option>
-              <option value="Jobvite">Jobvite</option>
-              <option value="Taleo">Taleo</option>
-              <option value="viDesktop">viDesktop</option>
-              <option value="Silkroad">Silkroad</option>
+            <?php
+            $conn = conn();
+            $result = $conn->query("select * from method");
+            while($record = $result->fetch_assoc())
+              printf("<option value='%s'>%s</option>", $record["id"], $record["method"]);
+            $conn->close();
+            ?>
             </select>
           </td></tr>
           <tr><td>Source: </td><td data-column='source_id'>
@@ -35,7 +36,7 @@ include_once("includes/data_editor.php");
               printf("<option value='%s'>%s</option>", $record["id"], $record["source"]);
             $conn->close();
             ?>
-            </select
+            </select>
           </td></tr>
           <tr><td>Each Posting Path: </td><td data-column='each_posting_path'><input type='text' style='width: 100%;' /></td></tr>
           <tr><td>Source Record ID Path: </td><td data-column='source_record_id_path'><input type='text' style='width: 100%;' /></td></tr>
@@ -59,7 +60,13 @@ include_once("includes/data_editor.php");
 
 <?php
 $conn = conn();
-$result = $conn->query("select job_posting_url.*, source.source from job_posting_url inner join source on job_posting_url.source_id = source.id order by source.source, job_posting_url.url");
+$result = $conn->query("
+	select job_posting_url.*, source.source, method.method 
+	from job_posting_url 
+	inner join source on job_posting_url.source_id = source.id 
+	inner join method on job_posting_url.method_id = method.id 
+	order by source.source, job_posting_url.url
+");
 print("<script>window.data_editor.init_table('#data_table', " . forgiving_json($result) . ");</script>");
 $conn->close();
 

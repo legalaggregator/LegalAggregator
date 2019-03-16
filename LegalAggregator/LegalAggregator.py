@@ -97,7 +97,16 @@ def save_data_frame(data):
 def get_job_posting_urls():
     myconn = get_conn()
     mycursor = myconn.cursor(pymysql.cursors.DictCursor)
-    mycursor.execute("select source.source, job_posting_url.* from job_posting_url inner join source on job_posting_url.source_id = source.id where url like '%kslaw.com/pages/%'")
+    mycursor.execute("""
+        select 
+            source.source, 
+            method.method, 
+            job_posting_url.* 
+        from job_posting_url inner 
+        join source on job_posting_url.source_id = source.id 
+        join method on job_posting_url.method_id = method.id 
+        where url like '%kslaw.com/pages/%'
+        """)
     myresult = mycursor.fetchall()
     mycursor.close()
     myconn.close()
