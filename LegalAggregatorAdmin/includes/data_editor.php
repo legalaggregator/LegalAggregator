@@ -30,7 +30,7 @@ if ($_POST["data_editor_cmd"] == "update") {
       $query .= "$key, ";
     $query = trim($query, " ,") . ") values (";
     foreach($data as $key => $value)
-      $query .= "'" + $conn->escape_string($value) + "', ";
+      $query .= "'" . $conn->escape_string($value) . "', ";
     $query = trim($query, " ,") . ")";
     $conn->query($query) or die($conn->error . "<br />" . $query);
     $conn->close();
