@@ -105,7 +105,7 @@ def get_job_posting_urls():
         from job_posting_url inner 
         join source on job_posting_url.source_id = source.id 
         join method on job_posting_url.method_id = method.id 
-        -- where url like '%kslaw.com/pages/%'
+        where url like '%taleo%'
         """)
     myresult = mycursor.fetchall()
     mycursor.close()
@@ -176,7 +176,21 @@ def scrape_silkroad(url, source):
     return data
 
 def scrape_taleo(url, source):
-    pass
+    data = get_data_frame()
+    page_response = requests.get(url, timeout=5, verify=False)
+    page_content = BeautifulSoup(page_response.content, "html.parser")
+    trs = page_content.select("#cws-search-results tr td")
+    for tr in trs:
+        try:
+            title = select_path(tr, "../td:nth-of-type(1)")
+            location = select_path(tr, "../td:nth-of-type(2)")
+            link = select_path(tr, "../a/@href")
+            source_record_id = select_path(tr, "../a/@href/~rid=(.*)")
+            data = data.append({ 'source': source, 'source_record_id': source_record_id, 'link': link, 'title': title, 'location': location }, ignore_index=True)
+        except Exception as e:
+            print("An error occurred")
+            print(e)
+    return data
 
 def scrape_json(params):
     data = get_data_frame()
