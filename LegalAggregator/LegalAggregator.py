@@ -105,7 +105,7 @@ def get_job_posting_urls():
         from job_posting_url inner 
         join source on job_posting_url.source_id = source.id 
         join method on job_posting_url.method_id = method.id 
-        where url like '%taleo%'
+        -- where url like '%taleo%'
         """)
     myresult = mycursor.fetchall()
     mycursor.close()
